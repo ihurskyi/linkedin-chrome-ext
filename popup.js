@@ -1,32 +1,61 @@
 const server = "https://cv-document-writer.herokuapp.com/"
 
+let elements = {
+    technology: "technology"
+}
+
 // Populate popup window with candidate data
 chrome.tabs.query({active: true, currentWindow: true}, function(tabs){
     loadingStart()
+    
+    // Fetch css classes for linkedin page, populate popup fields 
     fetch(server + 'schema')
     .then( res => res.json())
     .then( data => {
         chrome.tabs.sendMessage(tabs[0].id, {todo: 'retrieveText', schema: data}, (response) => {
-
             console.log(response)
-            document.getElementById('name').value = response.name
-            document.getElementById('company').value = response.company
-            document.getElementById('city').value = response.city
+            $('#name').val(response.name)
+            $('#company').val(response.company)
+            $('#city').val(response.city)
             loadingEnd()
         })
     })
     .catch((error) => {
         notify('error', 'Server does not response')
     })
+
+    // Populate technology dropdown list with available sheets
+    fetch(server + 'sheets')
+    .then( res => res.json())
+    .then( data => {
+        data.forEach(element => {
+            $(`.${elements.technology}`).append(`<option value="${element.id}">${element.title}</option>`)
+        });
+    })
+    .catch((error) => {
+        notify('error', 'Server does not response')
+    })
 })
+
+
 
 // Send candidate data througth API to server
 window.addEventListener('load', function (evt) {
-    document.getElementById("send").addEventListener("click", function() {
+    let form = document.querySelector('form');
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        
+        if (form.checkValidity() === false) {
+            event.stopPropagation();
+            return;
+        }
+
         let user = {
-            name: document.getElementById('name').value,
-            company: document.getElementById('company').value,
-            //city: document.getElementById('city').value,
+            name: $('#name').val(),
+            company: $('#company').val(),
+            city: $('#city').val(),
+            sheet: $(`.${elements.technology}`).val()
         }
         
         const promiseTabUrl= new Promise((resolve, reject) => {
@@ -60,6 +89,8 @@ window.addEventListener('load', function (evt) {
                 notify('error', 'Server error!' + error)
             })
         })
+
+        return;
     })
 });
 
@@ -72,18 +103,19 @@ function notify(type, message) {
     }
 
     chrome.notifications.create('notification', options, (notificationId) => {
-        window.close()
+        loadingEnd()
+        //window.close()
     })
 }
 
 function loadingStart() {
-    document.querySelector('button').setAttribute('disabled','')
-    document.getElementById('button-text').style.display = 'none'
-    document.getElementById('loading-text').style.display = 'block'
+    $('#send').attr('disabled', true)
+    $('#button-text').hide()
+    $('#loading-text').show()
 }
 
 function loadingEnd() {
-    document.querySelector('button').removeAttribute('disabled')
-    document.getElementById('button-text').style.display = 'block'
-    document.getElementById('loading-text').style.display = 'none'
+    $('#send').removeAttr('disabled')
+    $('#button-text').show()
+    $('#loading-text').hide()
 }
